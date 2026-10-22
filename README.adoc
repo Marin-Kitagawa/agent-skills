@@ -549,6 +549,8 @@ The "Unknown / unspecified" group includes packages whose frontmatter has no `li
 
 == Adding or Updating a Skill
 
+For the complete, up-to-date instructions on creating and publishing a skill, see the official skill authoring guide at https://skills.sh.
+
 A new skill should:
 
 . Use a unique lowercase folder name and a matching frontmatter `name`.
