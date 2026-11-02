@@ -41,25 +41,36 @@ const ease = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
 const span = (t, a, b) => ease((t - a) / (b - a));
 
 // draw(q, f) runs once per 12 fps frame with q the frame's time; a pure function of time, like every beat clock.
-function stopClock(D, draw) { let last = null; clockRun(t => { const f = Math.floor(t * FPS + 1e-6); if (f === last) return; last = f; draw(f / FPS, f); }, D); }
+// It runs to the beat's end, through the engine's hold after D (HOLD s), so a scene poses sensibly for q up to D + HOLD.
+function stopClock(D, draw) { let last = null; clockRun(t => { const f = Math.floor(t * FPS + 1e-6); if (f === last) return; last = f; draw(f / FPS, f); }, D, { tail: true }); }
 
 /* ---------- camera over a baked set ----------
    A view {x, y, z} is the world point at the frame's centre and the zoom. Moves: to(view, t0, dur) eases each given
    key from where the camera is at t0 (zooms keep one world point still, as the engine's camera does); cut(view, t0).
    Layers slide by their parallax factor k against the base view. soft(t0, on) swaps the far layers (k < 1) for their
-   blurred copies: shallow focus on close shots (on = 'all' blurs the puppets' plane too, for a set seen behind a close-up). Puppets go in cam.stage, on the k = 1 plane in front of `after`. */
+   blurred copies: shallow focus on close shots (on = 'all' blurs the puppets' plane too, for a set seen behind a close-up).
+   Puppets go in cam.stage, a k = 1 plane drawn just after the layer named `after`. Without one it is the set's layer
+   marked stage: true in sets.js (bake_sets.py and painted.py keep the mark), else the first layer with k 1, so a set
+   that always needs the same place for its puppets says so once (a river's tree in front of the bank, a house whose
+   front hides whoever is inside). stages: [layer names] adds a plane after each of those layers too, cam.stageAt[name],
+   for things that stand further back: ducks on a pond in front of its water, a grandmother at the window of a house
+   layer drawn over cam.stage. */
 function paperCam(p, setName, v0 = {}, { after = null, stages = [] } = {}) {
   const root = mk('g', {}, p), view = mk('g', {}, root), world = mk('g', {}, view), layers = [], ops = [], softs = [], shakes = [];
-  let stage = null; const stageAt = {};
-  for (const L of SETS[setName]) {
+  let stage = null; const stageAt = {}, set = SETS[setName];
+  if (!set) throw new Error(`paperCam: no set '${setName}' in img/sets/sets.js (${Object.keys(SETS).join(', ')})`);
+  after ??= (set.find(L => L.stage) || set.find(L => L.k === 1) || set[set.length - 1]).name;
+  for (const n of [after, ...stages]) if (!set.some(L => L.name === n)) console.warn(`paperCam: set '${setName}' has no layer '${n}' (${set.map(L => L.name).join(', ')})`);
+  for (const L of set) {
     const g = mk('g', {}, world), [x, y, width, height] = L.box, img = { x, y, width, height, preserveAspectRatio: 'none' };
     const sharp = mk('image', { href: `../img/sets/${setName}/${L.name}.webp`, ...img }, g);
     const blur = L.soft ? mk('image', { href: `../img/sets/${setName}/${L.name}-soft.webp`, ...img, visibility: 'hidden' }, g) : null;
     layers.push({ g, k: L.k, sharp, blur, name: L.name });
     if (stages.includes(L.name)) layers.push({ g: stageAt[L.name] = mk('g', {}, world), k: L.k });
-    if (L.name === (after || 'house') || (!after && L.k === 1 && !stage)) layers.push({ g: stage = mk('g', {}, world), k: 1 });
+    if (L.name === after) layers.push({ g: stage = mk('g', {}, world), k: 1 });
   }
-  mk('rect', { width: 1600, height: 900, fill: 'url(#vignette)' }, root);
+  if (!stage) layers.push({ g: stage = mk('g', {}, world), k: 1 });   // an unknown `after` (warned above): in front of everything
+  mk('rect', { width: 1600, height: 900, fill: 'url(#vignette)', 'pointer-events': 'none' }, root);   // a tap goes through to the picture
   // Parallax is measured from the set's own framing (base), wherever the beat's first view is.
   const base = { x: 800, y: 450, z: 1 }, start = { ...base, ...v0 };
   function at(t, n = ops.length) {
@@ -113,8 +124,8 @@ const mouthAt = (clip, t) => { let m = 'X'; if (t < 0) return m; for (const [at,
 
 /* ---------- puppets ----------
    A puppet is paper pieces on brass pins, built at its hip (0, 0) facing right, feet near y 166. pose(o, f) sets the
-   whole state for frame f; any key left out keeps its rest value. turn (1 … -1) squashes the flat figure to turn it
-   round: through the thin middle (|turn| < .55) the front head shows, past it the figure is the mirrored profile. */
+   whole state for frame f; any key left out keeps its rest value. A profile puppet that turns round squashes its
+   side figure, shows its whole front figure through the thin middle of the turn and comes out mirrored (puppets.md). */
 const pinAt = (x, y) => `<circle cx="${x}" cy="${y}" r="3.4" fill="#caa24c" stroke="#7d5f22" stroke-width="1.2"/>`;
 const tf = (el, s) => { if (el._t !== s) el.setAttribute('transform', el._t = s); };
 const vis = (el, on) => { const v = on ? 'inherit' : 'hidden'; if (el._v !== v) el.setAttribute('visibility', el._v = v); };
@@ -219,9 +230,14 @@ function trunkWipe(p, t0, dur, mode = 'in') {
   const [a, b] = mode === 'in' ? [1650, -200] : [-200, -2150];
   return q => { const u = Math.min(1, Math.max(0, (q - t0) / dur)); vis(g, mode === 'in' ? u > 0 : u < 1); tf(g, `translate(${(a + (b - a) * ease(u)).toFixed(0)},0)`); };
 }
-// The title card at the end: a paper label that drops in on its pin.
-function endCard(p, t0) {
-  const g = prop(p, `<g filter="url(#paper)"><rect x="560" y="330" width="480" height="240" rx="14" fill="#f3e9d2"/><rect x="580" y="350" width="440" height="200" rx="8" fill="none" stroke="#c8322f" stroke-width="5"/></g>
-    <text x="800" y="478" text-anchor="middle" font-family="Georgia, serif" font-size="78" font-style="italic" fill="#5a2a1e">The End</text>${pinAt(800, 342)}`);
+// The title card at the end: a paper label that drops in on its pin, as wide as its words. Give the words in the book's
+// language; { x, y } is the card's centre (default the frame's centre), size the letters' height in px (a title too long
+// for the frame gets smaller letters). Put it where it covers nothing the last shot needs (a score, a face).
+function endCard(p, t0, words = 'The End', { x = 800, y = 450, size = 78 } = {}) {
+  const c = document.createElement('canvas').getContext('2d'), wide = s => (c.font = `italic ${s}px Georgia, serif`, c.measureText(words).width + 2.2 * s);
+  if (wide(size) > 1500) size = Math.floor(size * 1500 / wide(size));
+  const w = Math.max(480, Math.ceil(wide(size))), h = Math.round(size * 3.08), L = Math.round(x - w / 2), T = Math.round(y - h / 2);
+  const g = prop(p, `<g filter="url(#paper)"><rect x="${L}" y="${T}" width="${w}" height="${h}" rx="14" fill="#f3e9d2"/><rect x="${L + 20}" y="${T + 20}" width="${w - 40}" height="${h - 40}" rx="8" fill="none" stroke="#c8322f" stroke-width="5"/></g>
+    <text x="${x}" y="${Math.round(y + size * .36)}" text-anchor="middle" font-family="Georgia, serif" font-size="${size}" font-style="italic" fill="#5a2a1e">${words}</text>${pinAt(x, T + 12)}`);
   return q => { const u = (q - t0) * FPS; vis(g, u >= 0); const d = [-60, -20, 8, -3, 0][Math.min(4, Math.max(0, Math.floor(u / 2)))]; tf(g, `translate(0,${d})`); };
 }

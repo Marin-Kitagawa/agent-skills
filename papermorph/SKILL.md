@@ -1,66 +1,76 @@
 ---
 name: papermorph
-description: Make or edit animated, narrated, interactive web books from reference PDFs, and animated picture books (paper-puppet films) from a story, a joke or a fairy tale. Use for book planning, storyboards, chapter animation and exercises, narration, and cover and contents pages, including "make the next chapter", "turn this story into a picture book" or "fix this animation". Deliver runnable static book files; bookshelf design, bookshelf registration and hosting are separate tasks.
+description: Make or edit animated, narrated, interactive web books from reference PDFs, animated picture books (paper-puppet films) from a story, a joke or a fairy tale, narrated documentaries about a book or an idea, built from public-domain pictures, and upright shorts for a phone feed that make one point in under three minutes. Use for book planning, storyboards, chapter animation and exercises, narration, and cover and contents pages, including "make the next chapter", "turn this story into a picture book", "make a documentary about this book", "make a short about this for YouTube Shorts" or "fix this animation". Deliver runnable static book files; bookshelf design, bookshelf registration and hosting are separate tasks.
 ---
 
 # Papermorph
 
-Each chapter is a short animated lesson film: the picture carries the explanation, the narration says it, and quick checks and practice happen inside the picture. Good means **alive** (things act and change with weight and timing), **composed** (each moment reads as one picture, text beside what it names), **true** (motion, labels and numbers agree at every moment) and **smooth** (it plays without stutter, Firefox included). Technically a chapter is one 1600×900 SVG stage plus a player; **beats** pair narration clips with timed actions.
+Papermorph makes three tiers of book on one engine:
 
-What the picture should be depends on the book and on the user, so the work starts with a conversation ([intake.md](references/intake.md)) that ends in `style.json`, the book's agreed style. Every chapter is made against it. `style.json` fixes the atoms (palette and meanings, fonts, voice, cast, shared components, approved chapters); composition stays free, so how each beat is laid out and choreographed is yours to judge against it and the approved chapters. Then read the reference for the technique in use: [diagrams.md](references/diagrams.md) (symbols and diagrams that change), [scenes.md](references/scenes.md) (illustrated scenes, actors, camera), [assets.md](references/assets.md) (shared components, images, sprites), [authoring.md](references/authoring.md) (chapter shape, narration, questions), [engine.md](references/engine.md), [review.md](references/review.md), [site.md](references/site.md), [team.md](references/team.md) (making chapters with subagents).
+- **Lessons**, from a textbook PDF: each chapter is a short animated lesson film where the picture carries the explanation, the narration says it, and quick checks and practice happen inside the picture.
+- **Picture books**, from a story, a joke or a fairy tale: short films of paper puppets in front of sets, drawn in code or painted by an image model, with voices, effects and music.
+- **Films**, from a book, an idea or the user's argument: narrated **documentaries** of found public-domain pictures, words and maps moved in step with the voice, and upright **shorts** for a phone feed that make one point in under three minutes.
 
-**Picture books** are the same machine pointed at a story: short films of paper puppets in front of sets, drawn in code or painted by an image model, with voices, effects and music. When the user brings a story, a joke or a fairy tale instead of a textbook, follow [stories.md](references/stories.md) (with [puppets.md](references/puppets.md), [painting.md](references/painting.md) and [sound.md](references/sound.md)) in place of the PDF steps; the engine, previews, review, site and team below apply unchanged.
+All are an SVG stage (1600×900, or 900×1600 for a short) plus a player; **beats** pair narration clips with timed actions. Good means **alive** (things act and change with weight and timing), **composed** (each moment reads as one picture, text beside what it names), **true** (motion, labels and numbers agree at every moment) and **smooth** (it plays without stutter, Firefox included).
 
-Follow the pipeline forward, entering at the requested stage for existing work. User requests override defaults. Re-create explanations, examples and drawings; keep source PDFs, page images and extracted text outside the static output folder and out of version control (`.gitignore`: `*.pdf`, `books/*/pages/`). Deliver a self-contained book folder with a cover, contents, chapters and local preview instructions.
+What the picture should be depends on the book and on the user, so the work starts with a conversation that ends in `style.json`: the user's words, the look they chose, the voices, which model does which step, and later the approved chapters. Every chapter is made against it; how each beat is laid out and choreographed is yours to judge against it and the approved chapters. User requests override defaults. Re-create explanations, examples and drawings; keep source PDFs, page images and extracted text outside the static output folder and out of version control (`.gitignore`: `*.pdf`, `books/*/pages/`). A chapter the Skill made is a first cut: review rounds and the user's viewing come before it is published.
+
+## Which tier
+
+Read the tier's first file, then only what the current step needs. Every file below is linked from here; none needs another to be found.
+
+| The user brings | Tier | Start with | Then, as the step needs |
+|---|---|---|---|
+| A textbook PDF (a course book too) | Lessons | [lessons.md](references/lessons/lessons.md) | [intake.md](references/lessons/intake.md) · [authoring.md](references/lessons/authoring.md) · [diagrams.md](references/lessons/diagrams.md) (tier 1) · [scenes.md](references/lessons/scenes.md) (tier 2) · [assets.md](references/lessons/assets.md) · [questions.md](references/lessons/questions.md) · [checks.md](references/lessons/checks.md) · [cover.md](references/lessons/cover.md) · [courses.md](references/lessons/courses.md) (citations, item bank, SCORM: only when the book calls for them) |
+| A story, a joke, a fairy tale, or a story book's PDF | Picture books | [stories.md](references/picture-books/stories.md) | [puppets.md](references/picture-books/puppets.md) · [painting.md](references/picture-books/painting.md) (a painted look) |
+| A book, an idea or a stretch of history to explain as a narrated film | Films: documentary | [films.md](references/films/films.md) | [documentary.md](references/films/documentary.md) |
+| One point to make in under three minutes, upright, for a phone feed (YouTube Shorts, TikTok, Reels), or a long film to recut | Films: shorts | [films.md](references/films/films.md) | [shorts.md](references/films/shorts.md) |
+
+Every tier shares the core:
+
+| File | What it holds |
+|---|---|
+| [core/style.md](references/core/style.md) | how to ask the user, the models step, `style.json` |
+| [core/publish.md](references/core/publish.md) | `new_book.py`, language, minutes, preview and delivery, video export |
+| [core/sound.md](references/core/sound.md) | the narration file, voices, levels, effects, music, captions |
+| [core/review.md](references/core/review.md) | seeing your own work in motion, frames, smoothness, director rounds |
+| [core/team.md](references/core/team.md) | making chapters with subagents, the coordinator, workers in parallel |
+| [core/engine.md](references/core/engine.md) | the player and drawing API, timing, camera, performance, traps |
+
+Start with the tier's intake whenever `books/<book>/style.json` does not exist yet; reuse answers and approvals already given. The reference books on https://papermorph.diamonddoge.org/ are the bar: the maths and science books for lessons, *Joke Collection* and *Little Red Riding Hood* for picture books, *Madness and Civilization*, *Shooting an Elephant* (interactive) and *The Pandemic* for documentaries, the *Madness and Civilization* shorts for shorts.
 
 ## Project layout
 
 ```
-books/<book>/
-  book.pdf, sections.json      source and page map (private)
-  pages/chNN/text.md, *.png    extracted reference material (private)
-  style.json                  the agreed style every chapter anchors to (assets/templates/style.json)
-  chapters.md                 chapter map and status
-  chapters/chNN.md            storyboard, errata, feedback
-  images/                     inbox, SOURCES.md, image-requests.md, processing scripts
-  review/chNN/                storyboard sheets, strips, check output
-content/<book>/chNN/           narration.<lang>.json and TTS cache
-tools/<book>/                 tests and evidence scripts
+books/<book>/                  private: source, style.json, storyboards, art, review/ (tier files list their own)
+content/<book>/chNN/           narration.<lang>.json and the voice cache
+tools/<book>/                  tests, audio scripts, evidence
 site/<book>/                   the static book (only this is delivered)
-  index.html, unit-art.js      cover + contents, unit sketches
-  lib/engine.*, volume.*,      the engine (player, cover/contents, unit headers), copied into the book by
-      contents.*, units.*        scripts/engine.py
-  lib/book.css                 this book's engine settings and style overrides
-  lib/*.js, img/               the book's element library and images
-  chNN/index.html, audio/<lang>/   a lesson, its beat MP3s + timings.js
+  index.html                   cover and contents, or a series page
+  lib/                         the engine (synced by engine.py), lib/book.css (this book's settings), the tier's kit, the book's own pieces
+  img/                         the book's pictures
+  chNN/index.html, audio/<lang>/   a chapter or episode, its beat MP3s and timings.js (films and picture books: audio/sfx/, audio/bgm/)
 ```
 
-A picture book adds `books/<book>/story.md` (the user's telling, verbatim), `storyboard.md`, `sets.js` (set sketches) and `art/` (generated pictures, `painted.json`, `costs.tsv`); its `site/<book>/lib/` holds the paper kit (`paper.js`, `cast.js`, `shared.js` from `assets/templates/picture-book/`) and `img/` the baked sets, props and puppet pieces; each episode `chNN/` has one script per scene and `audio/<lang>/`, `audio/sfx/`, `audio/bgm/`.
+`SKILL` means this skill's absolute folder; `<book>` is the book slug, `<lang>` its primary language code. `new_book.py` starts a book of any tier ([core/publish.md](references/core/publish.md#start-a-book-folder)).
 
-`SKILL` means this skill's absolute folder; `<book>` is the book slug, `<lang>` its primary language code. Existing books keep their paths. Needs: `uv`, `ffmpeg`/`ffprobe`, Edge TTS network access (or Kokoro, local: `uv run --python 3.12 --with kokoro`) and Playwright browsers (`uv run --with playwright playwright install chromium firefox`). Preview: `python3 SKILL/scripts/serve.py 8765 site` (no browser caching).
+Needs: `uv`, `ffmpeg`/`ffprobe`, Edge TTS network access (or Kokoro, local), github.com for `engine.py` when the repository's `engine/` folder is not at hand, an OpenRouter key only for the paid steps the user chooses (`paint.py`, `eleven.py`, `video.py`; `paint_openai.py` takes an OpenAI key), and Playwright browsers (`uv run --with playwright playwright install chromium firefox`; where Playwright's Chromium does not run, set `CHROME` to an installed Chrome, Chromium, Brave or Edge). Preview: `python3 SKILL/scripts/serve.py 8765 site` (no browser caching).
 
-## Pipeline
+## Scripts
 
-Start with intake whenever `books/<book>/style.json` does not exist yet; reuse answers and approvals already given.
+All in `SKILL/scripts/`; each prints its usage with `--help` when run with the `uv run --with …` its docstring's first lines name (without its packages even `--help` stops on the import).
 
-1. **Split.** Run `uv run --with pymupdf SKILL/scripts/outline.py books/<book>/book.pdf`; use `--level N -o books/<book>/sections.json` at chapter depth. For a PDF without usable chapter bookmarks, inspect `split_pages.py … --pages 1-12 --out books/<book>/pages`, then write the map from its contents (schema: `outline.py --help`). Extract chapter text with `split_pages.py … --sections books/<book>/sections.json --out books/<book>/pages --text-only`.
-2. **Intake.** Follow [intake.md](references/intake.md): find the PDF with the user, say what the book is, agree on one chapter to try and a tier, settle the look the way that tier needs, and write `style.json`.
-3. **Initialize.** Follow [site.md](references/site.md#start-a-book-folder); build agreed shared components once into the book's library ([assets.md](references/assets.md)) and list them in `style.json`.
-4. **Pilot.** Make the chosen chapter through the chapter loop and deliver it for the user's judgement. Fold their feedback into `style.json` and record the chapter under `approved`.
-5. **Remaining chapters and finish**, when the user wants the whole book: write `chapters.md`, produce chapters sequentially (see *Context*), complete cover text, contents and unit sketches using [site.md](references/site.md). Deliver the static book folder, its entry URL for local preview and any unresolved issues. For an LMS, package it as SCORM ([site.md](references/site.md#scorm-package-optional)).
+| For | Scripts |
+|---|---|
+| Every book | `new_book.py` start a book folder · `serve.py` preview without caching · `engine.py` sync the engine into books · `tts.py` narration and word times · `level.py` even loudness · `lint.py` static checks · `check.py` page errors, console warnings and beat lengths in Chromium and Firefox · `shot.py` beat screenshots · `strip.py` storyboard sheets and motion strips · `still.py` stretches where nothing moves · `playlog.py` sounds and captions against the picture · `perf.py` Firefox frame times · `export.py` MP4 and `.srt` · `sfx.py` synthesized effects |
+| Lessons | `outline.py` and `split_pages.py` page map and chapter text · `check_blank.py` empty openings · `overlap.py` arrows through text · `sprites.py` image processing steps · `refs.py` verified citations · `items.py` question bank · `scorm.py` LMS package |
+| Picture books | `mouths.py` mouth shapes · `join.py` one clip per scene · `bake_sets.py` set layers · `bake_puppets.py` puppet bitmaps · `paint.py` / `paint_openai.py` image-model pictures · `painted.py` place them in the book |
+| Films | `commons.py` public-domain pictures and recordings with their licences · `prep.py` print, line and full-bleed treatments · `trace.py` drawings that draw themselves on · `video.py` a clip from a still · `frames.py` a clip as treated frames · `geo.py` the map kit's data from Natural Earth · `eleven.py` ElevenLabs narration with word times · `music.py` a track cut to the film, and the bed in the voice's gaps · `safe.py` words outside an upright film's safe area |
 
-## Chapter loop
-
-1. **Read** this chapter's `pages/chNN/text.md`; render pages with `split_pages.py … --only chNN` when diagrams or missing text need images. Choose the ideas, examples and sections to teach.
-2. **Beats and narration**: list beats in `chapters/chNN.md` with what each says and which word triggers which action ([authoring.md](references/authoring.md)). Write `content/<book>/chNN/narration.<lang>.json`, then `uv run --with edge-tts SKILL/scripts/tts.py content/<book>/chNN/narration.<lang>.json site/<book>/chNN/audio/<lang>` (for `"engine": "kokoro"`: `uv run --python 3.12 --with kokoro …`).
-3. **Storyboard, layout first**: in the real page, place everything for one to three key moments per beat, real elements at their real sizes, no motion yet. Capture them into one sheet with `strip.py` and give each frame one line: what it says and where the eye goes. That sheet is the storyboard. Note what the chapter needs beyond the library: draw it, or add it to the image requests.
-4. **Motion**: add the motion, the camera and the questions; API and replay invariants are in [engine.md](references/engine.md).
-5. **Delivery pass**: watch your output in motion and judge it as a viewer would, against the storyboard; then run the checks in [review.md](references/review.md). Correct what you find, recheck, deliver; report unresolved problems.
-6. **Register**: add the chapter to the contents (`units` in `Contents.book` in `index.html`), set the previous chapter's `CHAPTER.next`, update `chapters.md` and `chapters/chNN.md`. Promote new shared decisions and recurring elements to `style.json` and the library. The coordinator owns this step when using subagents.
+`silence.py`, `ledger.py` (the one cost ledger: date, chapter, file, model, what, cost) and `browsers.py` are helpers the others import.
 
 ## Context
 
-- Keep intake and the pilot in the main conversation. Afterwards, when subagents are available, coordinate each chapter as a team: a fresh worker per step of the chapter loop, each on the cheapest model that does that step well, chapters one after another ([team.md](references/team.md)). Without subagents, run the same loop in the current agent with file-based state.
-- A worker needs little besides this Skill and `style.json`: the user's words, the look, the approved chapters to watch and read, the element library. A brief adds the chapter, its pages, the step's inputs and outputs and any current user request. Workers reply in a few lines; the coordinator registers the chapter.
-- Read only the reference needed for the current step. Use the engine API and inspect individual functions when needed; copy assets rather than reading their full source as instructions.
-- Keep `style.json` current and short. Chapter status, errata and historical feedback stay in `chapters.md` and `chapters/chNN.md`.
+- Talk with the user from the main conversation: intake, and every sheet and choice of the pilot. When subagents are available, later chapters are made as a team, each step on the model the user chose ([core/team.md](references/core/team.md)); without them, run the same steps in the current agent with file-based state.
+- Use the engine API and inspect individual functions when needed; copy kit files rather than reading their full source as instructions.
+- Keep `style.json` current and short; chapter status, errata and historical feedback stay in `chapters.md` and `chapters/chNN.md`.

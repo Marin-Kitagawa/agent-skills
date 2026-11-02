@@ -1,20 +1,35 @@
 #!/usr/bin/env python3
-"""Sound effects for a picture book, synthesized with numpy (no samples): named recipes written as mono 44.1 kHz MP3s.
+"""Sound effects for a film, synthesized with numpy (no samples): named recipes written as mono 44.1 kHz MP3s.
 
     uv run --with numpy python sfx.py site/<book>/ch01/audio/sfx knock door rain   # these effects, OUT_DIR/<name>.mp3
     uv run --with numpy python sfx.py site/<book>/ch01/audio/sfx all               # every recipe
-    python3 sfx.py --list                                                          # names with a one-line description
+    uv run --with numpy python sfx.py --list                                       # names with a one-line description
+    uv run --with numpy python sfx.py OUT_DIR splat --recipes books/<book>/sfx_recipes.py   # with the book's own recipes
+    uv run --with numpy python sfx.py --selftest                                   # checks the --recipes loading
 
 Needs ffmpeg. Every file is faded (5 ms) and peak-normalised to -3 dBFS; each recipe is seeded by its name, so a name
-always renders the same sound. Play them from a chapter with sfx(beat, seconds, 'name', volume) (paper-cutout kit,
-shared.js), which plays them at half volume under the voices.
+always renders the same sound. Play them from a chapter with sfx(beat, seconds, 'name', volume) (the engine's sfx(), in
+any film: a picture book or a documentary), which plays them at half volume under the voices. Even out voices and
+effects afterwards with level.py.
 
-Add a recipe: write a function that returns a float array at SR, built from the small toolkit below (t_of, unit, place,
-lp1/hp1/bpf filters, pluck, pink, drops), and list it in RECIPES. Keep them soft and natural: a hard high hiss reads
-as "scary rain" and a bare sine as a phone, so layer a low thump under a click, shape every sound with a decay, and
-listen before using one. Recipes: sting growl gulp door tick bell whoosh fly violin crickets chair (character and
-house sounds), knock chop bang bonk thud crash (wood, axe, glass, a wardrobe door), plop sniff chomp burp lick bark
-(eating and a dog), chime beep card coin (a convenience store), rain and rain-short (gentle rain).
+A book's own recipes: --recipes FILE.py (repeatable) imports FILE; every top-level function in it that takes no
+required argument and whose name does not start with _ becomes a recipe (underscores in the name become hyphens; the
+docstring's first line is its --list line; a book recipe replaces a built-in of the same name). Build them from this
+module (`from sfx import SR, t_of, unit, place, smooth, lp1, hp1, bpf, pluck, pink, drops, noise`; draw randomness
+from `noise(n)` or `sfx.rng`, which is seeded per recipe) and keep them in the book's folder, not in a copy of this script.
+
+Add a recipe here: write a function that returns a float array at SR, built from the small toolkit below (t_of, unit,
+place, smooth, lp1/hp1/bpf filters, pluck, pink, drops), and list it in RECIPES. Keep them soft and natural: a hard
+high hiss reads as "scary rain" and a bare sine as a phone, so layer a low thump under a click, shape every sound with
+a decay, and listen before using one. Recipes: sting growl gulp door tick bell whoosh fly violin crickets chair
+(character and house sounds), knock chop bang bonk thud crash (wood, axe, glass, a wardrobe door), clack chalk page
+(a game piece set down, a chalk line, a page turned), plop sniff chomp burp lick slurp hmph bark (eating, drinking, a
+nose, a dog), laugh applause (a person laughing, a small audience clapping), splash pop boing (water, a cork, a
+spring), chime beep card coin (a convenience store), rain and rain-short (gentle rain), creak latch sash shutter flap
+clang scrape (doors, windows, a shutter, cardboard, a steel bowl), inhale inhale-short (a breath in), patter patter1
+step1 (light steps, one step, a grown-up's shoe), honk gulls gull1 (a penguin or goose, seagulls, one gull), crack
+clop (a whip, hooves), bark-big woof-mf yip (a big dog, a smothered bark, a puppy), and beds: wind (8 s), surf (30 s),
+room (3 s room tone that tiles every 2.6 s), birds (10 s park with distant birds; 0.4 s fades, tiles every 9.6 s).
 """
 import math
 import os
@@ -102,7 +117,13 @@ def drops(n, rate, fc, q, decay, lo, hi):
     return y
 
 
-noise = lambda n: rng.standard_normal(n)
+def noise(n):
+    return rng.standard_normal(n)
+
+
+def smooth(x, n=40):
+    """Moving average over n samples: a soft, cheap low-pass that keeps the length."""
+    return np.convolve(x, np.ones(n) / n, mode="same")
 
 
 def sting():
@@ -437,11 +458,339 @@ def rain(dur=5.0, fade=.35):
     return y * np.minimum(t / fade, 1) * np.minimum((dur - t) / fade, 1)
 
 
+def creak():
+    """A door hinge creaking open a crack, 1.1 s: uneven stick-slip clicks ringing a wooden body, loudest mid-way."""
+    y, at = np.zeros(int(1.1 * SR)), .02
+    while at < 1.05:
+        k = t_of(.03)
+        click = bpf(noise(len(k)), 420, q=6) + .7 * bpf(noise(len(k)), 900, q=8)
+        place(y, unit(click) * np.exp(-k / .008) * (.5 + .5 * np.sin(np.pi * at / 1.1)), at)
+        at += 1 / (14 + 26 * np.sin(np.pi * at / 1.1) * (.7 + .3 * rng.random()))  # 14-40 clicks a second
+    return y
+
+
+def latch():
+    """A door latch clicking shut: two small metal clicks."""
+    y = np.zeros(int(.25 * SR))
+    for at, g in [(0, 1), (.06, .6)]:
+        t = t_of(.05)
+        place(y, unit(bpf(noise(len(t)), 3200, q=3)) * np.exp(-t / .006) * g, at)
+    return y
+
+
+def clang():
+    """An empty steel bowl dropped on stone: a bright ring, then quick rattles as it settles."""
+    y = np.zeros(int(.9 * SR))
+    for at, g, d in [(0, 1, .35), (.16, .55, .18), (.27, .35, .12), (.34, .2, .08)]:
+        t = t_of(d)
+        ring = sum(np.sin(2 * np.pi * f * t) * a for f, a in [(1180, 1), (1730, .6), (2610, .4), (3300, .25)])
+        place(y, unit(ring + .3 * hp1(noise(len(t)), 2000) * np.exp(-t / .004)) * np.exp(-t / (d / 3)) * g, at)
+    return y
+
+
+def shutter():
+    """A rolling steel shutter rattling down (1 s of slats) and banging on the ground."""
+    y = np.zeros(int(1.3 * SR))
+    for i in range(22):
+        t = t_of(.05)
+        place(y, unit(bpf(noise(len(t)), 1500 + 300 * (i % 3), q=4)) * np.exp(-t / .01) * (.35 + .3 * (i % 2)), i * .045)
+    t = t_of(.3)
+    place(y, (unit(bpf(noise(len(t)), 300, q=1)) + unit(np.sin(2 * np.pi * 90 * t))) * np.exp(-t / .07) * .7, 1.0)
+    return y
+
+
+def wind():
+    """A soft cold wind, 8 s bed: low noise around 500 Hz swelling in slow gusts."""
+    t = t_of(8.0)
+    n = len(t)
+    f = np.fft.rfftfreq(n, 1 / SR)
+    f[0] = 1
+    w = np.fft.irfft(np.fft.rfft(noise(n)) / np.sqrt(f) * np.exp(-((np.log(f) - np.log(500)) ** 2) / 1.2), n)
+    return unit(w) * (.45 + .55 * np.sin(np.pi * t / 4) ** 2) * np.minimum(t / 1.0, 1) * np.minimum((8 - t) / 1.2, 1)
+
+
+def room():
+    """Room tone, 3 s: an extractor hum (100 Hz) under a low wash; 0.4 s fades, so tiles every 2.6 s overlap smoothly."""
+    t = t_of(3.0)
+    n = len(t)
+    f = np.fft.rfftfreq(n, 1 / SR)
+    f[0] = 1
+    wash = np.fft.irfft(np.fft.rfft(noise(n)) / f * (f > 40) / (1 + (f / 600) ** 2), n)
+    hum = np.sin(2 * np.pi * 100 * t) + .4 * np.sin(2 * np.pi * 200 * t + 1)
+    return (unit(wash) * .8 + unit(hum) * .25) * np.minimum(t / .4, 1) * np.minimum((3 - t) / .4, 1)
+
+
+def inhale(dur=1.4):
+    """A big breath in through the nose: band noise swelling and rising (500 -> 1500 Hz), then a 0.12 s fade."""
+    t = t_of(dur)
+    return unit(bpf(noise(len(t)), 500 + 1000 * t / dur, q=1.5)) * np.minimum(t / (dur * .8), 1) ** 1.5 * np.minimum((dur - t) / .12, 1)
+
+
+def scrape():
+    """Metal scraped, 0.28 s: a short rasp ringing a steel bowl (2.1 / 3.4 / 5 kHz)."""
+    t = t_of(.28)
+    n = noise(len(t)) * (1 + .6 * np.sin(2 * np.pi * 28 * t))
+    v = bpf(n, 2100, q=8) + .7 * bpf(n, 3400, q=10) + .4 * bpf(n, 5000, q=10) + .3 * bpf(n, 900, q=1)
+    return unit(v) * np.sin(np.pi * t / .28) ** .8
+
+
+def flap():
+    """A cardboard flap dropping back: a dull papery slap, 0.15 s."""
+    t = t_of(.15)
+    return unit(bpf(noise(len(t)), 420, q=1.2)) * np.minimum(t / .004, 1) * np.exp(-t / .035)
+
+
+def sash():
+    """A sash window shoved up: a wooden slide (band noise rising) ending in a knock."""
+    t = t_of(.5)
+    y = unit(bpf(noise(len(t)), 500 + 900 * t / .5, q=2)) * np.minimum(t / .05, 1) * (.4 + .6 * t / .5)
+    k = t_of(.08)
+    place(y, unit(bpf(noise(len(k)), 700, q=3)) * np.exp(-k / .02), .42)
+    return y
+
+
+def honk():
+    """A penguin's (or goose's) bray: a nasal saw falling 470 -> 300 Hz with a quick wobble, through two formants; two pulses."""
+    y = np.zeros(int(.75 * SR))
+    for at, d, f0 in [(0, .16, 470), (.2, .42, 420)]:
+        t = t_of(d)
+        f = f0 - 120 * t / d + 18 * np.sin(2 * np.pi * 24 * t)
+        s = 2 * ((np.cumsum(f) / SR) % 1) - 1  # naive saw
+        v = bpf(s, 950, q=3) + .6 * bpf(s, 2300, q=4) + .2 * s
+        place(y, unit(v) * np.sin(np.pi * np.minimum(t / d, 1)) ** .6 * (.7 if at == 0 else 1), at)
+    return y
+
+
+def gulls():
+    """Three distant gull cries, 3 s: a falling 'kee-ow' with a little rasp, softened by distance."""
+    y = np.zeros(3 * SR)
+    for at, f0, g in [(.1, 1900, 1), (.55, 1750, .8), (1.9, 2000, .6)]:
+        t = t_of(.38)
+        f = f0 - 700 * (t / .38) ** 1.5 + 40 * np.sin(2 * np.pi * 30 * t)
+        ph = np.cumsum(f) / SR
+        v = np.sin(2 * np.pi * ph) + .35 * np.sin(4 * np.pi * ph) + .05 * noise(len(t))
+        place(y, lp1(v, 3000) * np.sin(np.pi * t / .38) ** .8 * g, at)
+    return y
+
+
+def surf(dur=30.0, fade_in=1.0, fade_out=1.5):
+    """Soft surf, 30 s: a low noise wash swelling and drawing back every 3 s.
+
+    One long file covers a scene (a short loop of separate plays gaps or doubles at every join); shaped in the
+    frequency domain, so no filter run-in."""
+    t = t_of(dur)
+    n = len(t)
+    f = np.fft.rfftfreq(n, 1 / SR)
+    f[0] = 1
+    w = np.fft.irfft(np.fft.rfft(noise(n)) / np.sqrt(f) / (1 + (f / 1100) ** 2) * (f > 60), n)
+    return unit(w) * (.4 + .6 * np.sin(np.pi * t / 3) ** 2) * np.minimum(t / fade_in, 1) * np.minimum((dur - t) / fade_out, 1)
+
+
+def patter(steps=12, gap=1 / 6):
+    """Light footsteps on stone (a small animal or a child): flat little slaps, six a second, 2 s."""
+    y = np.zeros(int((.06 + steps * gap) * SR))
+    for k in range(steps):
+        d = t_of(.06)
+        hit = unit(bpf(noise(len(d)), 900 + 150 * (k % 2), q=1.5) * np.exp(-d / .012)) * .6 + unit(np.sin(2 * np.pi * 180 * d) * np.exp(-d / .02)) * .4
+        place(y, hit * (.75 + .25 * (k % 2)), .02 + k * gap)
+    return y
+
+
+def step1():
+    """One grown-up's shoe on pavement, 0.2 s: a soft low thud under a short dull scuff (lower than patter)."""
+    y, d = np.zeros(int(.2 * SR)), t_of(.14)
+    thud = unit(np.sin(2 * np.pi * (130 - 60 * d / .14) * d) * np.exp(-d / .035))
+    scuff = unit(bpf(noise(len(d)), 1500, q=1.2) * np.exp(-d / .02) * np.minimum(d / .004, 1))
+    place(y, .6 * thud + .5 * scuff, .01)
+    return y
+
+
+def crack():
+    """A whip: a short swish, then a sharp snap with a little room ring, 0.5 s."""
+    y = np.zeros(int(.5 * SR))
+    sw = t_of(.16); place(y, unit(bpf(noise(len(sw)), 1400, q=1.2) * np.sin(np.pi * sw / sw[-1]) ** 2) * .25, 0)
+    s = t_of(.34); place(y, unit(hp1(noise(len(s)), 3000) * np.exp(-s / .006)) + unit(bpf(noise(len(s)), 2200, q=3) * np.exp(-s / .05)) * .3, .16)
+    return y
+
+
+def clop():
+    """Four slow hoof steps on a dirt road (2 s): dull knocks, a little uneven."""
+    y = np.zeros(int(2.0 * SR))
+    for k, at in enumerate((.05, .52, 1.0, 1.47)):
+        d = t_of(.12)
+        hit = unit(bpf(noise(len(d)), 380 + 40 * (k % 2), q=2) * np.exp(-d / .02)) * .7 + unit(np.sin(2 * np.pi * 150 * d) * np.exp(-d / .03)) * .5
+        place(y, hit * (.8 + .2 * (k % 2)), at)
+    return y
+
+
+def gull1():
+    """One distant gull cry (the last of gulls), for a second gull that is not the same pattern."""
+    return gulls()[int(1.85 * SR):int(2.4 * SR)]
+
+
+def yip():
+    """A puppy's tiny yip: a quick high squeak 900 -> 1300 -> 800 Hz, 0.2 s."""
+    t = t_of(.2)
+    ph = 2 * np.pi * np.cumsum(900 + 400 * np.sin(np.pi * t / .2)) / SR
+    return unit(np.sin(ph) + .3 * np.sin(2 * ph)) * np.sin(np.pi * t / .2) ** .5
+
+
+def bark_big(k=1.0, dur=.32, rough=.4):
+    """A big dog's 'WOOF': a harsh onset, then a rough voiced 'wuh' whose pitch jumps up and falls (200-320 Hz),
+    through mouth formants (550 / 1150 / 2500 Hz), a breathy tail."""
+    t = t_of(dur)
+    f = k * (200 + 120 * np.sin(np.pi / 2 * np.minimum(t / .05, 1)) - 140 * np.maximum(t - .05, 0) / dur)
+    f = f * (1 + .02 * noise(len(t)).cumsum() / np.sqrt(np.arange(1, len(t) + 1)))
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    src = sum(np.sin(h * ph) / h ** 1.1 for h in range(1, 18)) * (1 + rough * np.sin(2 * np.pi * 35 * t))
+    voiced = bpf(src, 550, q=2) + .8 * bpf(src, 1150, q=3) + .35 * bpf(src, 2500, q=4)
+    env = np.minimum(t / .008, 1) * np.where(t < .07, 1, np.exp(-(t - .07) / (dur / 3.2)))
+    return (unit(voiced) * .8 + unit(bpf(noise(len(t)), 1300, q=1.2)) * .25 * np.exp(-t / .2)
+            + unit(hp1(noise(len(t)), 1500) * np.exp(-t / .012)) * .35) * env
+
+
+def woof_mf():
+    """A bark smothered by paws: the start of a big bark, muffled, then a closed-mouth 'mf', 0.45 s."""
+    b = bark_big(.95)[:int(.15 * SR)]
+    b = lp1(lp1(b, 700), 700) * np.minimum((.15 - t_of(.15)) / .03, 1)
+    t = t_of(.25)
+    y = np.zeros(int(.45 * SR)); place(y, unit(b), 0); place(y, lp1(np.sin(2 * np.pi * 140 * t) * np.exp(-t / .08) * .6, 400), .14)
+    return y
+
+
+def clack():
+    """A wooden game piece set down on a wooden board: a dry click, a short hollow ring, a tiny settle, 0.25 s."""
+    y, t = np.zeros(int(.25 * SR)), t_of(.12)
+    click = unit(smooth(hp1(noise(len(t)), 1800), 4) * np.exp(-t / .0012))
+    ring = unit(bpf(noise(len(t)), 1250, q=9) * np.exp(-t / .022))
+    body = unit(np.sin(2 * np.pi * 520 * t) * np.exp(-t / .018))
+    place(y, .55 * click + .7 * ring + .35 * body, .005)
+    place(y, .18 * ring[:int(.05 * SR)] * np.exp(-t[:int(.05 * SR)] / .01), .04)   # the felt base settles
+    return y
+
+
+def chalk():
+    """A chalk line on wood or a board, 0.55 s: a gritty scratch with a faint squeak riding on it."""
+    t = t_of(.55)
+    grit = smooth(bpf(noise(len(t)), 2000, q=2.2), 10) * np.repeat(rng.uniform(.35, 1, int(np.ceil(.55 / .006))), int(.006 * SR))[:len(t)]
+    f = 2300 + 260 * np.sin(2 * np.pi * 3 * t) + 80 * noise(len(t)).cumsum() / SR
+    squeak = np.sin(2 * np.pi * np.cumsum(f) / SR) * (.5 + .5 * np.sin(2 * np.pi * 45 * t)) ** 2
+    env = np.minimum(t / .03, 1) * np.minimum((.55 - t) / .08, 1)
+    return (unit(grit) * .8 + unit(squeak) * .22) * env
+
+
+def slurp():
+    """A sip of something hot, 0.7 s: an airy suck rising in pitch, a little bubbly."""
+    t = t_of(.7)
+    air = bpf(noise(len(t)), 700 + 1300 * (t / .7) ** .7, q=2.5)
+    bub = .55 + .45 * np.sign(np.sin(2 * np.pi * np.cumsum(32 + 20 * rng.random(len(t))) / SR))
+    return unit(smooth(air * bub)) * np.sin(np.pi * t / .7) ** .7
+
+
+def hmph():
+    """A small offended 'hmph' through the nose, 0.4 s: a short low hum under a breath out."""
+    t = t_of(.4)
+    s = 2 * ((np.cumsum(175 - 55 * t / .4) / SR) % 1) - 1
+    hum = bpf(s, 260, q=2) + .25 * bpf(s, 1100, q=4)
+    breath = smooth(bpf(noise(len(t)), 650, q=1.6), 24)
+    return (unit(hum) * .7 + unit(breath) * .6) * np.minimum(t / .012, 1) * np.exp(-t / .11)
+
+
+def birds(dur=10.0):
+    """A park in the afternoon, 10 s bed: a soft far wash with a few distant birds; 0.4 s fades, so tiles every 9.6 s overlap."""
+    t = t_of(dur)
+    n = len(t)
+    f = np.fft.rfftfreq(n, 1 / SR)
+    f[0] = 1
+    wash = unit(np.fft.irfft(np.fft.rfft(noise(n)) / np.sqrt(f) * (f > 60) / (1 + (f / 900) ** 2), n)) * .35
+    y = np.zeros(n)
+    for _ in range(int(.9 * dur)):   # phrases of two to five chirps
+        at, f0, g = rng.uniform(.3, dur - 1), rng.uniform(3000, 4800), rng.uniform(.25, .6)
+        for k in range(rng.integers(2, 6)):
+            d = rng.uniform(.05, .11)
+            c = t_of(d)
+            sweep = f0 * (1 + .25 * np.sin(np.pi * c / d)) * rng.uniform(.92, 1.08)
+            place(y, np.sin(2 * np.pi * np.cumsum(sweep) / SR) * np.sin(np.pi * c / d) ** 2 * g, min(at + k * rng.uniform(.12, .2), dur - .3))
+    y = bpf(y, 3800, q=.8)   # distance takes the edge off
+    return (wash + unit(y) * .5) * np.minimum(t / .4, 1) * np.minimum((dur - t) / .4, 1)
+
+
+def laugh():
+    """A warm laugh, 1.2 s: five breathy 'ha's falling in pitch and getting softer."""
+    y = np.zeros(int(1.2 * SR))
+    for k in range(5):
+        d = .13 - .008 * k
+        t = t_of(d)
+        ph = np.cumsum(240 - 18 * k - 40 * t / d) / SR
+        src = 2 * (ph % 1) - 1
+        voiced = bpf(src, 750, q=3) + .7 * bpf(src, 1200, q=4) + .25 * bpf(src, 2600, q=5)
+        h = bpf(noise(len(t)), 1400, q=1) * np.exp(-t / .02)   # the breathy 'h' at each onset
+        env = np.minimum(t / .015, 1) * np.minimum((d - t) / .04, 1)
+        place(y, (unit(voiced) + .5 * unit(h)) * env * (1 - .13 * k), .02 + k * .19)
+    return y
+
+
+def applause(dur=3.0):
+    """A small audience clapping, 3 s: many hands at their own pace, swelling in and dying away."""
+    t = t_of(dur)
+    y = np.zeros(len(t))
+    for _ in range(18):   # 18 people clapping 3-5 times a second
+        rate, at, fc = rng.uniform(3, 5), rng.uniform(0, .4), rng.uniform(1100, 2200)
+        while at < dur - .1:
+            c = t_of(.05)
+            place(y, unit(bpf(noise(len(c)), fc, q=1.3)) * np.exp(-c / .008) * rng.uniform(.5, 1), at)
+            at += rng.normal(1 / rate, .02)
+    return y * np.minimum(t / .3, 1) * np.minimum((dur - t) / 1.2, 1)
+
+
+def splash():
+    """Something dropped into water, 0.9 s: a low plunge, a spray of noise and droplets falling back."""
+    t = t_of(.9)
+    n = len(t)
+    plunge = lp1(noise(n), 400) * np.exp(-t / .08)
+    spray = bpf(noise(n), 1800, q=.8) * np.minimum(t / .01, 1) * np.exp(-t / .18)
+    y = unit(plunge) * .7 + unit(spray) * .6 + unit(drops(n, 40, 1500, 6, .01, .3, 1)) * .3 * np.exp(-t / .5)
+    return y
+
+
+def page():
+    """A page turned, 0.5 s: a papery swish that rises and lands with a soft flap."""
+    t = t_of(.5)
+    crinkle = np.repeat(rng.uniform(.4, 1, int(np.ceil(.5 / .008))), int(.008 * SR))[:len(t)]
+    swish = unit(bpf(noise(len(t)), 1200 + 2400 * t / .5, q=1.1)) * crinkle * np.sin(np.pi * t / .5) ** 1.5
+    k = t_of(.06)
+    place(swish, unit(bpf(noise(len(k)), 500, q=1.2)) * np.exp(-k / .015) * .6, .42)
+    return swish
+
+
+def pop():
+    """A cork or a bubble popping, 0.2 s: a click and a quick hollow drop in pitch."""
+    t = t_of(.2)
+    tone = np.sin(2 * np.pi * np.cumsum(700 * np.exp(-t / .03) + 250) / SR) * np.exp(-t / .03)
+    return unit(tone) + .5 * unit(hp1(noise(len(t)), 2500) * np.exp(-t / .0015))
+
+
+def boing():
+    """A spring, 0.8 s: a low twang whose pitch wobbles fast and settles."""
+    t = t_of(.8)
+    f = 170 * (1 + .35 * np.exp(-t / .25) * np.sin(2 * np.pi * 11 * t))
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    return unit(np.sin(ph) + .3 * np.sin(2 * ph)) * np.minimum(t / .005, 1) * np.exp(-t / .3)
+
+
 RECIPES = {name: globals()[name] for name in (
     "sting growl gulp door tick bell whoosh fly violin crickets chair knock chop bang bonk thud crash plop sniff "
-    "chomp burp lick bark chime beep card coin rain").split()}
+    "chomp burp lick bark chime beep card coin rain creak latch clang shutter sash flap scrape inhale wind room "
+    "honk gulls surf patter step1 crack clop gull1 yip clack chalk slurp hmph birds laugh applause splash page pop "
+    "boing").split()}
+RECIPES["bark-big"] = bark_big
+RECIPES["woof-mf"] = woof_mf
 RECIPES["rain-short"] = lambda: rain(1.15, .12)
 RECIPES["rain-short"].__doc__ = "About one second of the same rain, for a quick cut."
+RECIPES["inhale-short"] = lambda: inhale(.85)
+RECIPES["inhale-short"].__doc__ = "A quicker breath in, 0.85 s."
+RECIPES["patter1"] = lambda: patter(1)
+RECIPES["patter1"].__doc__ = "One light step of the same patter."
 
 
 def write_mp3(path, y):
@@ -463,24 +812,88 @@ def write_mp3(path, y):
                         "-b:a", "128k", str(path)], check=True)
 
 
-def main(argv):
+def load_recipes(path):
+    """Import a book's recipe file and add its recipes to RECIPES; returns their names."""
+    import importlib.util
+    import inspect
+    sys.modules.setdefault("sfx", sys.modules[__name__])   # `import sfx` in the file gets this module, not a second copy
+    spec = importlib.util.spec_from_file_location(f"sfx_book_{zlib.crc32(os.path.abspath(path).encode())}", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    added = []
+    for name, fn in vars(mod).items():
+        if name.startswith("_") or not inspect.isfunction(fn) or fn.__module__ != mod.__name__:
+            continue
+        if any(p.default is p.empty and p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)
+               for p in inspect.signature(fn).parameters.values()):
+            continue   # a helper that needs arguments, not a recipe
+        RECIPES[name.replace("_", "-")] = fn
+        added.append(name.replace("_", "-"))
+    return added
+
+
+def render(name):
     global rng
-    if argv == ["--list"]:
+    rng = np.random.default_rng(zlib.crc32(name.encode()))
+    return RECIPES[name]()
+
+
+BOOK_TEST = '''import numpy as np
+from sfx import SR, t_of, unit, noise
+def _hidden():
+    return np.zeros(10)
+def helper(x):
+    return x
+def tap_tap(dur=.1):
+    "Two taps."
+    return unit(noise(len(t_of(dur))))
+def knock():
+    "A book's own knock."
+    return np.ones(SR // 10)
+'''
+
+
+def selftest():
+    """--recipes: a book file's recipes register (helpers and imports do not), override built-ins, render repeatably."""
+    with tempfile.TemporaryDirectory() as d:
+        f = os.path.join(d, "book.py")
+        with open(f, "w") as fh:
+            fh.write(BOOK_TEST)
+        assert load_recipes(f) == ["tap-tap", "knock"]
+        assert "helper" not in RECIPES and "_hidden" not in RECIPES and "unit" not in RECIPES
+        a, b = render("tap-tap"), render("tap-tap")
+        assert len(a) == 4410 and np.array_equal(a, b)
+        assert np.all(render("knock") == 1)
+    print("sfx selftest ok")
+
+
+def main(argv):
+    import argparse
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("out", nargs="?", help="folder for <name>.mp3 (the chapter's audio/sfx)")
+    ap.add_argument("names", nargs="*", help="recipe names, or all")
+    ap.add_argument("--recipes", action="append", default=[], metavar="FILE.py", help="a book's own recipes")
+    ap.add_argument("--list", action="store_true", help="print the recipe names with a one-line description")
+    ap.add_argument("--selftest", action="store_true", help="check the --recipes loading")
+    a = ap.parse_args(argv)
+    if a.selftest:
+        return selftest()
+    for f in a.recipes:
+        load_recipes(f)
+    if a.list:
         for name, fn in RECIPES.items():
             doc = (fn.__doc__ or "").strip().splitlines()
-            print(f"{name:12s}{doc[0] if doc else ''}")
+            print(f"{name:14s}{doc[0] if doc else ''}")
         return
-    if len(argv) < 2 or argv[0] in ("-h", "--help"):
-        print(__doc__)
-        sys.exit(0 if argv[:1] in (["-h"], ["--help"]) else 2)
-    out, names = argv[0], (list(RECIPES) if argv[1:] == ["all"] else argv[1:])
+    if not a.out or not a.names:
+        ap.error("give an output folder and recipe names (or all)")
+    names = list(RECIPES) if a.names == ["all"] else a.names
     unknown = [n for n in names if n not in RECIPES]
     if unknown:
         sys.exit(f"unknown: {', '.join(unknown)} (sfx.py --list)")
-    os.makedirs(out, exist_ok=True)
+    os.makedirs(a.out, exist_ok=True)
     for name in names:
-        rng = np.random.default_rng(zlib.crc32(name.encode()))
-        write_mp3(os.path.join(out, name + ".mp3"), RECIPES[name]())
+        write_mp3(os.path.join(a.out, name + ".mp3"), render(name))
         print("wrote", name)
 
 
